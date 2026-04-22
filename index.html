@@ -1,482 +1,350 @@
-import { useState, useEffect } from "react";
-import {
-Package, ChevronDown, ChevronUp,
-LogIn, LogOut, Truck, ListChecks, AlarmClock,
-ExternalLink, FolderOpen, RefreshCw, AlertCircle, CheckCircle2, MessageCircle, Copy, Check
-} from "lucide-react";
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>電商管理系統</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+body { background:#f9fafb; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body class="max-w-md mx-auto">
 
-const CONFIG = {
-PICK_LIST_URL: "https://drive.google.com/drive/folders/1uV44BSDkXYoOvY4DEjpJOn7XdFQIFvBP?dmr=1&ec=wgc-drive-hero-goto",
-CLOCK_SCRIPT_URL:
-"https://script.google.com/macros/s/AKfycbwNw8PsyxzIqRPuYpjp3ZypJe8KEBMKqgf6bbS-xUTKWsWtrAhEVqHEaZM8K8vDg7Lb/exec",
-TASKS_CSV_URL:
-"https://docs.google.com/spreadsheets/d/1frBa1Ca6-cGvp88yPLoTfSilMSND7Z6No2L1qfKeF2s/export?format=csv&gid=0",
-CLOCK_SHEET_URL: "https://docs.google.com/spreadsheets/d/1iGDa_pzcIuFfQ-tOev5SyGusFF9H3m0P3KBuHad2bjI/edit?usp=sharing",
-};
+<header class="bg-white border-b border-gray-200 px-4 py-3 shadow-sm fixed top-0 left-0 right-0 max-w-md mx-auto z-10">
+  <h1 class="text-center font-extrabold text-gray-800 text-base tracking-wide">🛒 電商管理系統</h1>
+</header>
 
-const sopSteps = [
-"進入「批次出貨」頁面。",
-"點擊「全部」的「蝦皮店到店 - 隔日到貨」。",
-"勾選「全選」核取方塊。",
-"點擊「大量安排出貨」。",
-"下載撿貨單：點擊「下載其他出貨文件」→「撿貨單」→「下載所選文件」。",
-"處理 PDF 儲存，覆蓋桌面上的「隔日」。",
-"下載寄件單：返回頁面，點擊「下載其他出貨文件」→「寄件單」→ 勾選「熱感列印」→「下載所選文件」。",
-"點擊「列印出貨文件」。",
-"點擊「收起」回到初始狀態。",
-];
+<main class="pt-14 pb-20">
 
-const hctSteps = [
-{ text: "點擊下方連結前往新竹物流網站", link: { url: "https://apsweb.hct.com.tw/sctm/", label: "開啟新竹物流系統 ↗" } },
-{ text: "登入資訊：企業代碼 0592039 ／ 帳號 ADMIN ／ 密碼 abcd1234" },
-{ text: "點擊「網路託運」→「寄貨」→「銷貨出貨」" },
-{ text: "點擊「+ 建立托運單」" },
-{ text: "輸入寄件資料" },
-{ text: "點擊「報表」→「標籤」→ 勾選項目 →「列印」" },
-];
-
-const hctLogin = [
-["企業代碼", "0592039"],
-["帳號", "ADMIN"],
-["密碼", "abcd1234"],
-];
-
-const CS_ITEMS = [
-{ q: "有貨嗎？", a: "賣場商品皆為現貨，歡迎下單！若於 14:00 前下單，將於當天出貨。" },
-{ q: "2點前問什麼時候出？", a: "今天 14:00 前下單，今天出貨唷！" },
-{ q: "現場買", a: "有問題可以撥打客服 0978170169" },
-{ q: "可以開發票嗎？", a: "下單時於「備註欄」填上「統編」開立【雲端發票】🧾" },
-{ q: "漏寄、破掉", a: "我們很努力包裝，仍不敵運送過程易破損。賣場誠信經營，提供買家申請退款（無需寄回破損玻璃）如有需要請再次下單，因蝦皮未提供補寄服務 📦" },
-{ q: "發票在哪裡？", a: "領取發票請至：https://i.ajinerp.com/" },
-];
-
-const WEEKLY_TASKS_DEFAULT = [
-{ id: 1, label: "處理訂單" },
-{ id: 2, label: "回覆訊息" },
-{ id: 3, label: "包材訂購" },
-{ id: 4, label: "清點庫存" },
-{ id: 5, label: "退換貨處理" },
-{ id: 6, label: "週三掃地" },
-{ id: 7, label: "週五換垃圾袋" },
-{ id: 8, label: "動線優化" },
-];
-
-// ═══════════════════════════════════════
-// 新竹物流 Accordion
-// ═══════════════════════════════════════
-function HctAccordion() {
-const [open, setOpen] = useState(false);
-return (
-<div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-  <button onClick={()=> setOpen(o => !o)}
-    className="w-full flex items-center justify-between p-4 bg-white active:bg-gray-50 text-left">
-    <div className="flex items-center gap-2">
-      <Package size={18} className="text-purple-500 shrink-0" />
-      <span className="font-bold text-gray-800 text-sm leading-tight">
-        新竹物流出貨教學<br />
-        <span className="font-normal text-gray-500">出貨流程 SOP</span>
-      </span>
+  <!-- 分頁一：出貨教學 -->
+  <div id="tab-shipping" class="tab-content p-4 space-y-4">
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+      <p class="font-bold text-blue-800 text-sm mb-2">🚚 執行順序</p>
+      <div class="flex flex-wrap gap-2 text-xs font-semibold">
+        <span class="bg-blue-600 text-white px-2 py-1 rounded-lg">蝦皮隔日</span><span class="text-blue-400">→</span>
+        <span class="bg-blue-600 text-white px-2 py-1 rounded-lg">蝦皮店到店</span><span class="text-blue-400">→</span>
+        <span class="bg-blue-600 text-white px-2 py-1 rounded-lg">7-11</span><span class="text-blue-400">→</span>
+        <span class="bg-blue-600 text-white px-2 py-1 rounded-lg">新竹物流</span>
+      </div>
     </div>
-    {open ?
-    <ChevronUp size={20} className="text-gray-400 shrink-0" /> :
-    <ChevronDown size={20} className="text-gray-400 shrink-0" />}
-  </button>
-  {open && (
-  <div className="bg-gray-50 px-4 pb-4 pt-2 border-t border-gray-100">
-    <ol className="space-y-3">
-      {hctSteps.map((step, i) => (
-      <li key={i} className="flex gap-3">
-        <span
-          className="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">{i
-          + 1}</span>
-        <div className="text-sm text-gray-700 leading-relaxed">
-          {step.text}
-          {step.link && (
-          <a href={step.link.url} target="_blank" rel="noopener noreferrer"
-            className="mt-1 flex items-center gap-1 text-purple-600 font-semibold underline">
-            <ExternalLink size={13} />
-            {step.link.label}
-          </a>
-          )}
+
+    <a href="https://drive.google.com/drive/folders/1uV44BSDkXYoOvY4DEjpJOn7XdFQIFvBP?dmr=1&ec=wgc-drive-hero-goto"
+      target="_blank" class="flex items-center justify-between w-full bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-amber-400 rounded-xl p-2 text-white text-lg">📁</div>
+        <div>
+          <p class="font-bold text-amber-900 text-sm">查看撿貨總表</p>
+          <p class="text-xs text-amber-600 mt-0.5">點擊開啟 Google Drive 資料夾</p>
         </div>
-      </li>
-      ))}
-    </ol>
-    <div className="mt-4 bg-purple-50 border border-purple-200 rounded-xl p-3 space-y-1">
-      <p className="text-xs font-bold text-purple-700 mb-2">🔐 登入資訊</p>
-      {hctLogin.map(([k, v]) => (
-      <div key={k} className="flex justify-between text-xs">
-        <span className="text-gray-500">{k}</span>
-        <span className="font-mono font-bold text-gray-800">{v}</span>
       </div>
-      ))}
-    </div>
-  </div>
-  )}
-</div>
-);
-}
+      <span class="text-amber-500 text-lg">↗</span>
+    </a>
 
-// ═══════════════════════════════════════
-// 分頁一：出貨教學
-// ═══════════════════════════════════════
-function ShippingTab() {
-const [open, setOpen] = useState(false);
-return (
-<div className="p-4 space-y-4 pb-24">
-  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-    <div className="flex items-center gap-2 mb-2">
-      <Truck size={18} className="text-blue-600 shrink-0" />
-      <span className="font-bold text-blue-800 text-sm">執行順序</span>
-    </div>
-    <div className="flex flex-wrap gap-2 text-xs font-semibold">
-      {["蝦皮隔日", "蝦皮店到店", "7-11", "新竹物流"].map((s, i, arr) => (
-      <span key={s} className="flex items-center gap-1">
-        <span className="bg-blue-600 text-white px-2 py-1 rounded-lg">{s}</span>
-        {i < arr.length - 1 && <span className="text-blue-400">→</span>}
-      </span>
-      ))}
-    </div>
-  </div>
-
-  <a href={CONFIG.PICK_LIST_URL} target="_blank" rel="noopener noreferrer"
-    className="flex items-center justify-between w-full bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 active:bg-amber-100">
-    <div className="flex items-center gap-3">
-      <div className="bg-amber-400 rounded-xl p-2">
-        <FolderOpen size={20} className="text-white" />
-      </div>
-      <div>
-        <p className="font-bold text-amber-900 text-sm">查看撿貨總表</p>
-        <p className="text-xs text-amber-600 mt-0.5">點擊開啟 Google Drive 資料夾</p>
-      </div>
-    </div>
-    <ExternalLink size={18} className="text-amber-500 shrink-0" />
-  </a>
-
-  <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-    <button onClick={()=> setOpen(o => !o)}
-      className="w-full flex items-center justify-between p-4 bg-white active:bg-gray-50 text-left">
-      <div className="flex items-center gap-2">
-        <Package size={18} className="text-orange-500 shrink-0" />
-        <span className="font-bold text-gray-800 text-sm leading-tight">
-          蝦皮店到店 - 隔日到貨<br />
-          <span className="font-normal text-gray-500">出貨流程 SOP</span>
-        </span>
-      </div>
-      {open ?
-      <ChevronUp size={20} className="text-gray-400 shrink-0" /> :
-      <ChevronDown size={20} className="text-gray-400 shrink-0" />}
-    </button>
-    {open && (
-    <div className="bg-gray-50 px-4 pb-4 pt-2 border-t border-gray-100">
-      <ol className="space-y-3">
-        {sopSteps.map((step, i) => (
-        <li key={i} className="flex gap-3">
-          <span
-            className="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">{i
-            + 1}</span>
-          <span className="text-sm text-gray-700 leading-relaxed">{step}</span>
-        </li>
-        ))}
-      </ol>
-    </div>
-    )}
-  </div>
-
-  <HctAccordion />
-</div>
-);
-}
-
-// ═══════════════════════════════════════
-// 分頁二：員工打卡
-// ═══════════════════════════════════════
-function ClockInTab() {
-const [now, setNow] = useState(new Date());
-const [records, setRecords] = useState([]);
-const [toast, setToast] = useState(null);
-
-useEffect(() => {
-const t = setInterval(() => setNow(new Date()), 1000);
-return () => clearInterval(t);
-}, []);
-
-const fmt = d => d.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-const fmtDate = d => d.toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long"
-});
-
-const showToast = (ok, msg) => {
-setToast({ ok, msg });
-setTimeout(() => setToast(null), 3500);
-};
-
-const punch = (type) => {
-const time = new Date();
-const label = type === "上班" ? "上班打卡" : "下班打卡";
-setRecords(r => [{ id: Date.now(), label, time: fmt(time) }, ...r]);
-showToast(true, `${label}成功：${fmt(time)}`);
-};
-
-return (
-<div className="p-4 space-y-4 pb-24">
-  {toast && (
-  <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${toast.ok
-    ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700" }`}>
-    {toast.ok ?
-    <CheckCircle2 size={16} /> :
-    <AlertCircle size={16} />}
-    {toast.msg}
-  </div>
-  )}
-  <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-6 text-center text-white shadow-lg">
-    <p className="text-sm opacity-80 mb-1">{fmtDate(now)}</p>
-    <p className="text-5xl font-mono font-bold tracking-wider">{fmt(now)}</p>
-  </div>
-  <div className="grid grid-cols-2 gap-3">
-    {[["上班", "bg-green-500 active:bg-green-600", LogIn], ["下班", "bg-red-500 active:bg-red-600", LogOut]].map(([type,
-    cls, Icon]) => (
-    <button key={type} onClick={()=> punch(type)}
-      className={`flex flex-col items-center justify-center gap-2 ${cls} text-white rounded-2xl py-6 font-bold text-lg
-      shadow-md`}>
-      <Icon size={28} />
-      {type}打卡
-    </button>
-    ))}
-  </div>
-  <div className="bg-red-50 border border-red-300 rounded-2xl p-3 text-center">
-    <p className="text-red-600 font-bold text-sm leading-relaxed">
-      ⚠️ 打卡後請務必拍照上傳至 LINE 群組
-    </p>
-  </div>
-  <a href={CONFIG.CLOCK_SHEET_URL} target="_blank" rel="noopener noreferrer"
-    className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 active:bg-gray-100">
-    <span className="text-sm font-semibold text-gray-700">查看打卡記錄 Sheets</span>
-    <ExternalLink size={16} className="text-gray-400" />
-  </a>
-  {records.length > 0 && (
-  <div className="border border-gray-200 rounded-2xl overflow-hidden">
-    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">本次打卡紀錄</span>
-    </div>
-    <ul className="divide-y divide-gray-100">
-      {records.map(r => (
-      <li key={r.id} className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          {r.label === "上班打卡" ?
-          <LogIn size={16} className="text-green-500" /> :
-          <LogOut size={16} className="text-red-500" />}
-          <span className={`text-sm font-semibold ${r.label==="上班打卡" ? "text-green-700" : "text-red-700"
-            }`}>{r.label}</span>
+    <!-- 蝦皮 SOP -->
+    <div class="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <button onclick="toggleAccordion('shopee')" class="w-full flex items-center justify-between p-4 bg-white text-left">
+        <div class="flex items-center gap-2">
+          <span class="text-orange-500">📦</span>
+          <span class="font-bold text-gray-800 text-sm leading-tight">蝦皮店到店 - 隔日到貨<br/><span class="font-normal text-gray-500">出貨流程 SOP</span></span>
         </div>
-        <span className="text-sm font-mono text-gray-600">{r.time}</span>
-      </li>
-      ))}
-    </ul>
-  </div>
-  )}
-</div>
-);
-}
-
-// ═══════════════════════════════════════
-// 分頁三：每週任務
-// ═══════════════════════════════════════
-function TasksTab() {
-const [tasks, setTasks] = useState(WEEKLY_TASKS_DEFAULT.map(t => ({ ...t, done: false })));
-const [fetching, setFetching] = useState(true);
-const [error, setError] = useState(null);
-
-const loadTasks = async () => {
-setFetching(true);
-setError(null);
-try {
-const res = await fetch(CONFIG.TASKS_CSV_URL);
-if (!res.ok) throw new Error("無法讀取");
-const text = await res.text();
-const rows = text.trim().split("\n").slice(1);
-const parsed = rows.map((row, i) => {
-const cols = row.split(",");
-const label = (cols[0] || "").trim().replace(/"/g, "");
-const status = (cols[1] || "").trim().replace(/"/g, "");
-return { id: i, label, done: status === "完成" };
-}).filter(t => t.label);
-setTasks(parsed.length > 0 ? parsed : WEEKLY_TASKS_DEFAULT.map(t => ({ ...t, done: false })));
-} catch (e) {
-setError("無法從 Sheets 讀取，顯示預設任務");
-setTasks(WEEKLY_TASKS_DEFAULT.map(t => ({ ...t, done: false })));
-} finally {
-setFetching(false);
-}
-};
-
-useEffect(() => { loadTasks(); }, []);
-
-const toggle = id => setTasks(ts => ts.map(t => t.id === id ? { ...t, done: !t.done } : t));
-const doneCount = tasks.filter(t => t.done).length;
-
-const weekLabel = () => {
-const now = new Date();
-const day = now.getDay();
-const monday = new Date(now);
-monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-const sunday = new Date(monday);
-sunday.setDate(monday.getDate() + 6);
-const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
-return `本週任務 ${fmt(monday)} - ${fmt(sunday)}`;
-};
-
-if (fetching) return (
-<div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
-  <RefreshCw size={28} className="animate-spin" />
-  <p className="text-sm">讀取任務中…</p>
-</div>
-);
-
-return (
-<div className="p-4 space-y-4 pb-24">
-  {error && (
-  <div
-    className="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-amber-800 text-xs">
-    <AlertCircle size={14} className="shrink-0" />{error}
-  </div>
-  )}
-  <div className="flex items-center justify-between">
-    <div>
-      <h2 className="font-bold text-gray-800 text-lg">每週任務</h2>
-      <p className="text-xs text-gray-400">{weekLabel()}</p>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">
-        {doneCount} / {tasks.length} 完成
-      </span>
-      <button onClick={loadTasks} className="p-2 rounded-xl bg-gray-100 active:bg-gray-200">
-        <RefreshCw size={16} className="text-gray-500" />
+        <span id="arrow-shopee" class="text-gray-400">▼</span>
       </button>
-    </div>
-  </div>
-  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-    <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: tasks.length ?
-      `${(doneCount / tasks.length) * 100}%` : "0%" }} />
-  </div>
-  <div className="space-y-3">
-    {tasks.map(task => (
-    <button key={task.id} onClick={()=> toggle(task.id)}
-      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all ${task.done ?
-      "bg-gray-50 border-gray-200" : "bg-white border-indigo-200 shadow-sm"}`}>
-      <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors
-        ${task.done ? "bg-indigo-500 border-indigo-500" : "border-gray-300" }`}>
-        {task.done && <span className="text-white text-xs font-bold">✓</span>}
+      <div id="body-shopee" class="hidden bg-gray-50 px-4 pb-4 pt-2 border-t border-gray-100">
+        <ol class="space-y-3">
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">1</span><span class="text-sm text-gray-700">進入「批次出貨」頁面。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">2</span><span class="text-sm text-gray-700">點擊「全部」的「蝦皮店到店 - 隔日到貨」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">3</span><span class="text-sm text-gray-700">勾選「全選」核取方塊。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">4</span><span class="text-sm text-gray-700">點擊「大量安排出貨」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">5</span><span class="text-sm text-gray-700">下載撿貨單：點擊「下載其他出貨文件」→「撿貨單」→「下載所選文件」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">6</span><span class="text-sm text-gray-700">處理 PDF 儲存，覆蓋桌面上的「隔日」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">7</span><span class="text-sm text-gray-700">下載寄件單：返回頁面 →「下載其他出貨文件」→「寄件單」→ 勾選「熱感列印」→「下載所選文件」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">8</span><span class="text-sm text-gray-700">點擊「列印出貨文件」。</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">9</span><span class="text-sm text-gray-700">點擊「收起」回到初始狀態。</span></li>
+        </ol>
       </div>
-      <span className={`text-base font-semibold transition-all ${task.done ? "line-through text-gray-400"
-        : "text-gray-800" }`}>
-        {task.label}
-      </span>
-    </button>
-    ))}
-  </div>
-  {tasks.length > 0 && doneCount === tasks.length && (
-  <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
-    <p className="text-green-700 font-bold">🎉 本週任務全部完成！</p>
-  </div>
-  )}
-</div>
-);
-}
-
-// ═══════════════════════════════════════
-// 分頁四：客服教學
-// ═══════════════════════════════════════
-function CsItem({ q, a }) {
-const [open, setOpen] = useState(false);
-const [copied, setCopied] = useState(false);
-
-const copy = (e) => {
-e.stopPropagation();
-navigator.clipboard.writeText(a).then(() => {
-setCopied(true);
-setTimeout(() => setCopied(false), 2000);
-});
-};
-
-return (
-<div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-  <button onClick={()=> setOpen(o => !o)}
-    className="w-full flex items-center justify-between p-4 bg-white active:bg-gray-50 text-left">
-    <div className="flex items-center gap-2">
-      <MessageCircle size={16} className="text-teal-500 shrink-0" />
-      <span className="font-bold text-gray-800 text-sm">{q}</span>
     </div>
-    {open ?
-    <ChevronUp size={18} className="text-gray-400 shrink-0" /> :
-    <ChevronDown size={18} className="text-gray-400 shrink-0" />}
+
+    <!-- 新竹物流 SOP -->
+    <div class="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <button onclick="toggleAccordion('hct')" class="w-full flex items-center justify-between p-4 bg-white text-left">
+        <div class="flex items-center gap-2">
+          <span class="text-purple-500">📦</span>
+          <span class="font-bold text-gray-800 text-sm leading-tight">新竹物流出貨教學<br/><span class="font-normal text-gray-500">出貨流程 SOP</span></span>
+        </div>
+        <span id="arrow-hct" class="text-gray-400">▼</span>
+      </button>
+      <div id="body-hct" class="hidden bg-gray-50 px-4 pb-4 pt-2 border-t border-gray-100">
+        <ol class="space-y-3">
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+            <div class="text-sm text-gray-700">點擊下方連結前往新竹物流網站<br/>
+              <a href="https://apsweb.hct.com.tw/sctm/" target="_blank" class="text-purple-600 font-semibold underline">開啟新竹物流系統 ↗</a>
+            </div>
+          </li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">2</span><span class="text-sm text-gray-700">登入資訊：企業代碼 0592039 ／ 帳號 ADMIN ／ 密碼 abcd1234</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">3</span><span class="text-sm text-gray-700">點擊「網路託運」→「寄貨」→「銷貨出貨」</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">4</span><span class="text-sm text-gray-700">點擊「+ 建立托運單」</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">5</span><span class="text-sm text-gray-700">輸入寄件資料</span></li>
+          <li class="flex gap-3"><span class="shrink-0 w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">6</span><span class="text-sm text-gray-700">點擊「報表」→「標籤」→ 勾選項目 →「列印」</span></li>
+        </ol>
+        <div class="mt-4 bg-purple-50 border border-purple-200 rounded-xl p-3 space-y-1">
+          <p class="text-xs font-bold text-purple-700 mb-2">🔐 登入資訊</p>
+          <div class="flex justify-between text-xs"><span class="text-gray-500">企業代碼</span><span class="font-mono font-bold text-gray-800">0592039</span></div>
+          <div class="flex justify-between text-xs"><span class="text-gray-500">帳號</span><span class="font-mono font-bold text-gray-800">ADMIN</span></div>
+          <div class="flex justify-between text-xs"><span class="text-gray-500">密碼</span><span class="font-mono font-bold text-gray-800">abcd1234</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分頁二：員工打卡 -->
+  <div id="tab-clockin" class="tab-content hidden p-4 space-y-4">
+    <div id="toast" class="hidden rounded-xl px-4 py-3 text-sm font-semibold"></div>
+    <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-6 text-center text-white shadow-lg">
+      <p id="clock-date" class="text-sm opacity-80 mb-1"></p>
+      <p id="clock-time" class="text-5xl font-mono font-bold tracking-wider"></p>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="punch('上班')" class="flex flex-col items-center justify-center gap-2 bg-green-500 active:bg-green-600 text-white rounded-2xl py-6 font-bold text-lg shadow-md">⬆️ 上班打卡</button>
+      <button onclick="punch('下班')" class="flex flex-col items-center justify-center gap-2 bg-red-500 active:bg-red-600 text-white rounded-2xl py-6 font-bold text-lg shadow-md">⬇️ 下班打卡</button>
+    </div>
+    <div class="bg-red-50 border border-red-300 rounded-2xl p-3 text-center">
+      <p class="text-red-600 font-bold text-sm">⚠️ 打卡後請務必拍照上傳至 LINE 群組</p>
+    </div>
+    <a href="https://docs.google.com/spreadsheets/d/1iGDa_pzcIuFfQ-tOev5SyGusFF9H3m0P3KBuHad2bjI/edit?usp=sharing"
+      target="_blank" class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
+      <span class="text-sm font-semibold text-gray-700">📊 查看打卡記錄 Sheets</span>
+      <span class="text-gray-400">↗</span>
+    </a>
+    <div id="records-wrap" class="hidden border border-gray-200 rounded-2xl overflow-hidden">
+      <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+        <span class="text-xs font-bold text-gray-500">本次打卡紀錄</span>
+      </div>
+      <ul id="records-list" class="divide-y divide-gray-100"></ul>
+    </div>
+  </div>
+
+  <!-- 分頁三：每週任務 -->
+  <div id="tab-tasks" class="tab-content hidden p-4 space-y-4">
+    <div id="task-error" class="hidden bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-amber-800 text-xs"></div>
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-bold text-gray-800 text-lg">每週任務</h2>
+        <p id="task-week" class="text-xs text-gray-400"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="task-count" class="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">0 / 0 完成</span>
+        <button onclick="renderTasks()" class="p-2 rounded-xl bg-gray-100 text-gray-500">↺</button>
+      </div>
+    </div>
+    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div id="task-progress" class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+    <div id="task-list" class="space-y-3"></div>
+    <div id="task-done-msg" class="hidden bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+      <p class="text-green-700 font-bold">🎉 本週任務全部完成！</p>
+    </div>
+  </div>
+
+  <!-- 分頁四：客服教學 -->
+  <div id="tab-cs" class="tab-content hidden p-4 space-y-3">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-teal-600 text-lg">💬</span>
+      <h2 class="font-bold text-gray-800 text-lg">客服教學</h2>
+    </div>
+    <p class="text-xs text-gray-400">點擊問題展開，按「複製」直接貼到對話</p>
+    <div id="cs-list" class="space-y-3 pb-24"></div>
+  </div>
+
+</main>
+
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 flex shadow-lg z-10">
+  <button onclick="switchTab('shipping')" id="nav-shipping" class="nav-btn flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-indigo-600">
+    <span class="text-lg">🚚</span><span class="text-xs font-semibold">出貨教學</span>
   </button>
-  {open && (
-  <div className="bg-teal-50 border-t border-gray-100 px-4 py-3">
-    <p className="text-sm text-gray-700 leading-relaxed mb-3">{a}</p>
-    <button onClick={copy} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all
-      ${copied ? "bg-green-500 text-white" : "bg-teal-500 text-white active:bg-teal-600" }`}>
-      {copied ?
-      <Check size={14} /> :
-      <Copy size={14} />}
-      {copied ? "已複製！" : "複製回覆內容"}
-    </button>
-  </div>
-  )}
-</div>
-);
-}
+  <button onclick="switchTab('clockin')" id="nav-clockin" class="nav-btn flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-gray-400">
+    <span class="text-lg">⏰</span><span class="text-xs font-semibold">員工打卡</span>
+  </button>
+  <button onclick="switchTab('tasks')" id="nav-tasks" class="nav-btn flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-gray-400">
+    <span class="text-lg">✅</span><span class="text-xs font-semibold">每週任務</span>
+  </button>
+  <button onclick="switchTab('cs')" id="nav-cs" class="nav-btn flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-gray-400">
+    <span class="text-lg">💬</span><span class="text-xs font-semibold">客服教學</span>
+  </button>
+</nav>
 
-function CustomerServiceTab() {
-return (
-<div className="p-4 space-y-3 pb-24">
-  <div className="flex items-center gap-2 mb-1">
-    <MessageCircle size={18} className="text-teal-600" />
-    <h2 className="font-bold text-gray-800 text-lg">客服教學</h2>
-  </div>
-  <p className="text-xs text-gray-400 mb-2">點擊問題展開，按「複製」直接貼到對話</p>
-  {CS_ITEMS.map((item, i) =>
-  <CsItem key={i} q={item.q} a={item.a} />)}
-</div>
-);
-}
+<script>
+const CLOCK_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNw8PsyxzIqRPuYpjp3ZypJe8KEBMKqgf6bbS-xUTKWsWtrAhEVqHEaZM8K8vDg7Lb/exec";
+const TASKS_CSV_URL    = "https://docs.google.com/spreadsheets/d/1frBa1Ca6-cGvp88yPLoTfSilMSND7Z6No2L1qfKeF2s/export?format=csv&gid=0";
 
-// ═══════════════════════════════════════
-// 主 App
-// ═══════════════════════════════════════
-const TABS = [
-{ id: "shipping", label: "出貨教學", Icon: Truck },
-{ id: "clockin", label: "員工打卡", Icon: AlarmClock },
-{ id: "tasks", label: "每週任務", Icon: ListChecks },
-{ id: "cs", label: "客服教學", Icon: MessageCircle },
+// ── 客服資料 ──
+const CS_ITEMS = [
+  { q: "有貨嗎？", a: "賣場商品皆為現貨，歡迎下單！若於 14:00 前下單，將於當天出貨。" },
+  { q: "2點前問什麼時候出？", a: "今天 14:00 前下單，今天出貨唷！" },
+  { q: "現場買", a: "有問題可以撥打客服 0978170169" },
+  { q: "可以開發票嗎？", a: "下單時於「備註欄」填上「統編」開立【雲端發票】🧾" },
+  { q: "漏寄、破掉", a: "我們很努力包裝，仍不敵運送過程易破損。賣場誠信經營，提供買家申請退款（無需寄回破損玻璃）如有需要請再次下單，因蝦皮未提供補寄服務 📦" },
+  { q: "發票在哪裡？", a: "領取發票請至：https://i.ajinerp.com/" },
 ];
 
-export default function App() {
-const [tab, setTab] = useState("shipping");
-return (
-<div className="flex flex-col h-screen max-w-md mx-auto bg-gray-50 relative overflow-hidden">
-  <header className="bg-white border-b border-gray-200 px-4 py-3 shrink-0 shadow-sm">
-    <h1 className="text-center font-extrabold text-gray-800 text-base tracking-wide">🛒 電商管理系統</h1>
-  </header>
-  <main className="flex-1 overflow-y-auto">
-    {tab === "shipping" &&
-    <ShippingTab />}
-    {tab === "clockin" &&
-    <ClockInTab />}
-    {tab === "tasks" &&
-    <TasksTab />}
-    {tab === "cs" &&
-    <CustomerServiceTab />}
-  </main>
-  <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 flex shadow-lg">
-    {TABS.map(({ id, label, Icon }) => (
-    <button key={id} onClick={()=> setTab(id)}
-      className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${tab === id ?
-      "text-indigo-600" : "text-gray-400"}`}>
-      <Icon size={20} strokeWidth={tab===id ? 2.5 : 1.8} />
-      <span className={`text-xs font-semibold ${tab===id ? "text-indigo-600" : "text-gray-400" }`}>{label}</span>
-    </button>
-    ))}
-  </nav>
-</div>
-);
+// ── 每週任務預設 ──
+const WEEKLY_DEFAULT = [
+  { id:1, label:"處理訂單" },
+  { id:2, label:"回覆訊息" },
+  { id:3, label:"包材訂購" },
+  { id:4, label:"清點庫存" },
+  { id:5, label:"退換貨處理" },
+  { id:6, label:"週三掃地" },
+  { id:7, label:"週五換垃圾袋" },
+  { id:8, label:"動線優化" },
+];
+let tasks = WEEKLY_DEFAULT.map(t => ({ ...t, done: false }));
+
+// ── 時鐘 ──
+function updateClock() {
+  const now  = new Date();
+  document.getElementById("clock-date").textContent = now.toLocaleDateString("zh-TW", { year:"numeric", month:"2-digit", day:"2-digit", weekday:"long" });
+  document.getElementById("clock-time").textContent = now.toLocaleTimeString("zh-TW", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
 }
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── 打卡 ──
+function punch(type) {
+  const now   = new Date();
+  const date  = now.toISOString().split("T")[0];
+  const time  = now.toLocaleTimeString("zh-TW", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  const label = type === "上班" ? "上班打卡" : "下班打卡";
+  const url   = `${CLOCK_SCRIPT_URL}?action=${encodeURIComponent(type)}&time=${encodeURIComponent(date + " " + time)}`;
+
+  showToast(true, `${label} 送出中：${time}`);
+  addRecord(label, time);
+
+  fetch(url)
+    .then(r => r.json())
+    .then(d => showToast(d.ok, d.ok ? `${label}成功：${time}` : "寫入失敗：" + d.error))
+    .catch(() => showToast(false, "網路錯誤，請重試"));
+}
+
+function addRecord(label, time) {
+  document.getElementById("records-wrap").classList.remove("hidden");
+  const li = document.createElement("li");
+  li.className = "flex items-center justify-between px-4 py-3";
+  const isIn = label === "上班打卡";
+  li.innerHTML = `<span class="flex items-center gap-2 text-sm font-semibold ${isIn ? "text-green-700" : "text-red-700"}">${isIn ? "⬆️" : "⬇️"} ${label}</span><span class="text-sm font-mono text-gray-600">${time}</span>`;
+  document.getElementById("records-list").prepend(li);
+}
+
+function showToast(ok, msg) {
+  const t = document.getElementById("toast");
+  t.className = `rounded-xl px-4 py-3 text-sm font-semibold ${ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`;
+  t.textContent = (ok ? "✅ " : "❌ ") + msg;
+  t.classList.remove("hidden");
+  setTimeout(() => t.classList.add("hidden"), 3500);
+}
+
+// ── Accordion ──
+function toggleAccordion(id) {
+  const body  = document.getElementById("body-" + id);
+  const arrow = document.getElementById("arrow-" + id);
+  const isHidden = body.classList.contains("hidden");
+  body.classList.toggle("hidden");
+  arrow.textContent = isHidden ? "▲" : "▼";
+}
+
+// ── 每週任務 ──
+function weekLabel() {
+  const now = new Date();
+  const day = now.getDay();
+  const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const f = d => `${d.getMonth()+1}/${d.getDate()}`;
+  return `本週任務 ${f(mon)} - ${f(sun)}`;
+}
+document.getElementById("task-week").textContent = weekLabel();
+
+function renderTasks() {
+  const list = document.getElementById("task-list");
+  list.innerHTML = "";
+  const done = tasks.filter(t => t.done).length;
+  document.getElementById("task-count").textContent = `${done} / ${tasks.length} 完成`;
+  document.getElementById("task-progress").style.width = tasks.length ? `${(done/tasks.length)*100}%` : "0%";
+  document.getElementById("task-done-msg").classList.toggle("hidden", done !== tasks.length);
+
+  tasks.forEach(task => {
+    const btn = document.createElement("button");
+    btn.onclick = () => { task.done = !task.done; renderTasks(); };
+    btn.className = `w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left ${task.done ? "bg-gray-50 border-gray-200" : "bg-white border-indigo-200 shadow-sm"}`;
+    btn.innerHTML = `
+      <div class="w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 ${task.done ? "bg-indigo-500 border-indigo-500" : "border-gray-300"}">
+        ${task.done ? '<span class="text-white text-xs font-bold">✓</span>' : ""}
+      </div>
+      <span class="text-base font-semibold ${task.done ? "line-through text-gray-400" : "text-gray-800"}">${task.label}</span>`;
+    list.appendChild(btn);
+  });
+}
+renderTasks();
+
+// ── 客服教學 ──
+function buildCS() {
+  const list = document.getElementById("cs-list");
+  CS_ITEMS.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "border border-gray-200 rounded-2xl overflow-hidden shadow-sm";
+    div.innerHTML = `
+      <button onclick="toggleCS(${i})" class="w-full flex items-center justify-between p-4 bg-white text-left">
+        <div class="flex items-center gap-2">
+          <span class="text-teal-500">💬</span>
+          <span class="font-bold text-gray-800 text-sm">${item.q}</span>
+        </div>
+        <span id="cs-arrow-${i}" class="text-gray-400">▼</span>
+      </button>
+      <div id="cs-body-${i}" class="hidden bg-teal-50 border-t border-gray-100 px-4 py-3">
+        <p class="text-sm text-gray-700 leading-relaxed mb-3">${item.a}</p>
+        <button id="cs-copy-${i}" onclick="copyCS(${i})"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-teal-500 text-white active:bg-teal-600">
+          📋 複製回覆內容
+        </button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleCS(i) {
+  const body  = document.getElementById("cs-body-" + i);
+  const arrow = document.getElementById("cs-arrow-" + i);
+  const isHidden = body.classList.contains("hidden");
+  body.classList.toggle("hidden");
+  arrow.textContent = isHidden ? "▲" : "▼";
+}
+
+function copyCS(i) {
+  navigator.clipboard.writeText(CS_ITEMS[i].a).then(() => {
+    const btn = document.getElementById("cs-copy-" + i);
+    btn.textContent = "✅ 已複製！";
+    btn.classList.replace("bg-teal-500", "bg-green-500");
+    setTimeout(() => {
+      btn.textContent = "📋 複製回覆內容";
+      btn.classList.replace("bg-green-500", "bg-teal-500");
+    }, 2000);
+  });
+}
+buildCS();
+
+// ── 分頁切換 ──
+function switchTab(id) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
+  document.getElementById("tab-" + id).classList.remove("hidden");
+  document.querySelectorAll(".nav-btn").forEach(el => {
+    el.classList.remove("text-indigo-600");
+    el.classList.add("text-gray-400");
+  });
+  const nav = document.getElementById("nav-" + id);
+  nav.classList.add("text-indigo-600");
+  nav.classList.remove("text-gray-400");
+}
+</script>
+</body>
+</html>
